@@ -1,0 +1,54 @@
+service: atc-monitoring-service
+
+package:
+  exclude:
+    - aws/**
+    - awscliv2.zip
+    - .git/**
+    - .vscode/**
+    - README.md
+    - .env
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: us-east-2
+
+functions:
+  fetchAudio:
+    handler: src/handler.handler
+    events:
+      - schedule: rate(5 minutes)
+
+  transcribeAudio:
+    handler: functions/transcribeAudio.handler
+    events:
+      - s3:
+          bucket: atc-audio-bucket
+          event: s3:ObjectCreated:*
+
+  analyzeText:
+    handler: functions/analyzeText.handler
+    events:
+      - s3:
+          bucket: atc-transcripts-bucket
+          event: s3:ObjectCreated:*
+
+  notify:
+    handler: functions/notify.handler
+    events:
+      - sqs:
+          arn:
+            Fn::GetAtt: [AtcNotificationQueue, Arn]
+
+resources:
+  Resources:
+    AtcTranscriptsBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: atc-transcripts-bucket-us-east-2
+
+    AtcNotificationQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: atc-notification-queue

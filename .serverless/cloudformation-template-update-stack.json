@@ -1,0 +1,550 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "The AWS CloudFormation template for this Serverless application",
+  "Resources": {
+    "ServerlessDeploymentBucket": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "ServerlessDeploymentBucketPolicy": {
+      "Type": "AWS::S3::BucketPolicy",
+      "Properties": {
+        "Bucket": {
+          "Ref": "ServerlessDeploymentBucket"
+        },
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "s3:*",
+              "Effect": "Deny",
+              "Principal": "*",
+              "Resource": [
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition"
+                      },
+                      ":s3:::",
+                      {
+                        "Ref": "ServerlessDeploymentBucket"
+                      },
+                      "/*"
+                    ]
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition"
+                      },
+                      ":s3:::",
+                      {
+                        "Ref": "ServerlessDeploymentBucket"
+                      }
+                    ]
+                  ]
+                }
+              ],
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": false
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "FetchAudioLogGroup": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": "/aws/lambda/atc-monitoring-service-dev-fetchAudio"
+      }
+    },
+    "TranscribeAudioLogGroup": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": "/aws/lambda/atc-monitoring-service-dev-transcribeAudio"
+      }
+    },
+    "AnalyzeTextLogGroup": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": "/aws/lambda/atc-monitoring-service-dev-analyzeText"
+      }
+    },
+    "NotifyLogGroup": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": "/aws/lambda/atc-monitoring-service-dev-notify"
+      }
+    },
+    "IamRoleLambdaExecution": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": [
+                  "lambda.amazonaws.com"
+                ]
+              },
+              "Action": [
+                "sts:AssumeRole"
+              ]
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": {
+              "Fn::Join": [
+                "-",
+                [
+                  "atc-monitoring-service",
+                  "dev",
+                  "lambda"
+                ]
+              ]
+            },
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogStream",
+                    "logs:CreateLogGroup",
+                    "logs:TagResource"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/atc-monitoring-service-dev*:*"
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/atc-monitoring-service-dev*:*:*"
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "sqs:ReceiveMessage",
+                    "sqs:DeleteMessage",
+                    "sqs:GetQueueAttributes"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::GetAtt": [
+                        "AtcNotificationQueue",
+                        "Arn"
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "Path": "/",
+        "RoleName": {
+          "Fn::Join": [
+            "-",
+            [
+              "atc-monitoring-service",
+              "dev",
+              {
+                "Ref": "AWS::Region"
+              },
+              "lambdaRole"
+            ]
+          ]
+        }
+      }
+    },
+    "FetchAudioLambdaFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Code": {
+          "S3Bucket": {
+            "Ref": "ServerlessDeploymentBucket"
+          },
+          "S3Key": "serverless/atc-monitoring-service/dev/1724789898742-2024-08-27T20:18:18.742Z/atc-monitoring-service.zip"
+        },
+        "Handler": "src/handler.handler",
+        "Runtime": "nodejs18.x",
+        "FunctionName": "atc-monitoring-service-dev-fetchAudio",
+        "MemorySize": 1024,
+        "Timeout": 6,
+        "Role": {
+          "Fn::GetAtt": [
+            "IamRoleLambdaExecution",
+            "Arn"
+          ]
+        }
+      },
+      "DependsOn": [
+        "FetchAudioLogGroup"
+      ]
+    },
+    "TranscribeAudioLambdaFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Code": {
+          "S3Bucket": {
+            "Ref": "ServerlessDeploymentBucket"
+          },
+          "S3Key": "serverless/atc-monitoring-service/dev/1724789898742-2024-08-27T20:18:18.742Z/atc-monitoring-service.zip"
+        },
+        "Handler": "functions/transcribeAudio.handler",
+        "Runtime": "nodejs18.x",
+        "FunctionName": "atc-monitoring-service-dev-transcribeAudio",
+        "MemorySize": 1024,
+        "Timeout": 6,
+        "Role": {
+          "Fn::GetAtt": [
+            "IamRoleLambdaExecution",
+            "Arn"
+          ]
+        }
+      },
+      "DependsOn": [
+        "TranscribeAudioLogGroup"
+      ]
+    },
+    "AnalyzeTextLambdaFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Code": {
+          "S3Bucket": {
+            "Ref": "ServerlessDeploymentBucket"
+          },
+          "S3Key": "serverless/atc-monitoring-service/dev/1724789898742-2024-08-27T20:18:18.742Z/atc-monitoring-service.zip"
+        },
+        "Handler": "functions/analyzeText.handler",
+        "Runtime": "nodejs18.x",
+        "FunctionName": "atc-monitoring-service-dev-analyzeText",
+        "MemorySize": 1024,
+        "Timeout": 6,
+        "Role": {
+          "Fn::GetAtt": [
+            "IamRoleLambdaExecution",
+            "Arn"
+          ]
+        }
+      },
+      "DependsOn": [
+        "AnalyzeTextLogGroup"
+      ]
+    },
+    "NotifyLambdaFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Code": {
+          "S3Bucket": {
+            "Ref": "ServerlessDeploymentBucket"
+          },
+          "S3Key": "serverless/atc-monitoring-service/dev/1724789898742-2024-08-27T20:18:18.742Z/atc-monitoring-service.zip"
+        },
+        "Handler": "functions/notify.handler",
+        "Runtime": "nodejs18.x",
+        "FunctionName": "atc-monitoring-service-dev-notify",
+        "MemorySize": 1024,
+        "Timeout": 6,
+        "Role": {
+          "Fn::GetAtt": [
+            "IamRoleLambdaExecution",
+            "Arn"
+          ]
+        }
+      },
+      "DependsOn": [
+        "NotifyLogGroup"
+      ]
+    },
+    "FetchAudioLambdaVersion9LNW9MwAHSNv6N0xk8v8FVkMOJMmJC0ADUTaEUi8YCo": {
+      "Type": "AWS::Lambda::Version",
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "FunctionName": {
+          "Ref": "FetchAudioLambdaFunction"
+        },
+        "CodeSha256": "t0cQXTZ7HRi1h7Re0pkpLjd3P/2/caUGu1rJPbIFi2k="
+      }
+    },
+    "TranscribeAudioLambdaVersiont6kGBBkivM9WhstH7N65Rb4ZzPHKMIEU1OWh1NYZBg": {
+      "Type": "AWS::Lambda::Version",
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "FunctionName": {
+          "Ref": "TranscribeAudioLambdaFunction"
+        },
+        "CodeSha256": "t0cQXTZ7HRi1h7Re0pkpLjd3P/2/caUGu1rJPbIFi2k="
+      }
+    },
+    "AnalyzeTextLambdaVersionAMXnV7ZccIG4TY6nEMpkFGRJsvQNjL20Vi3yX2a7pk": {
+      "Type": "AWS::Lambda::Version",
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "FunctionName": {
+          "Ref": "AnalyzeTextLambdaFunction"
+        },
+        "CodeSha256": "t0cQXTZ7HRi1h7Re0pkpLjd3P/2/caUGu1rJPbIFi2k="
+      }
+    },
+    "NotifyLambdaVersionBqxTsmNnV4GIuTpeIQs2vUazQSgckVIvkLFq4W3D1s": {
+      "Type": "AWS::Lambda::Version",
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "FunctionName": {
+          "Ref": "NotifyLambdaFunction"
+        },
+        "CodeSha256": "t0cQXTZ7HRi1h7Re0pkpLjd3P/2/caUGu1rJPbIFi2k="
+      }
+    },
+    "FetchAudioEventsRuleSchedule1": {
+      "Type": "AWS::Events::Rule",
+      "Properties": {
+        "ScheduleExpression": "rate(5 minutes)",
+        "State": "ENABLED",
+        "Targets": [
+          {
+            "Arn": {
+              "Fn::GetAtt": [
+                "FetchAudioLambdaFunction",
+                "Arn"
+              ]
+            },
+            "Id": "fetchAudioSchedule"
+          }
+        ]
+      }
+    },
+    "FetchAudioLambdaPermissionEventsRuleSchedule1": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "FetchAudioLambdaFunction",
+            "Arn"
+          ]
+        },
+        "Action": "lambda:InvokeFunction",
+        "Principal": "events.amazonaws.com",
+        "SourceArn": {
+          "Fn::GetAtt": [
+            "FetchAudioEventsRuleSchedule1",
+            "Arn"
+          ]
+        }
+      }
+    },
+    "S3BucketAtcaudiobucket": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketName": "atc-audio-bucket",
+        "NotificationConfiguration": {
+          "LambdaConfigurations": [
+            {
+              "Event": "s3:ObjectCreated:*",
+              "Function": {
+                "Fn::GetAtt": [
+                  "TranscribeAudioLambdaFunction",
+                  "Arn"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "DependsOn": [
+        "TranscribeAudioLambdaPermissionAtcaudiobucketS3"
+      ]
+    },
+    "S3BucketAtctranscriptsbucket": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketName": "atc-transcripts-bucket",
+        "NotificationConfiguration": {
+          "LambdaConfigurations": [
+            {
+              "Event": "s3:ObjectCreated:*",
+              "Function": {
+                "Fn::GetAtt": [
+                  "AnalyzeTextLambdaFunction",
+                  "Arn"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "DependsOn": [
+        "AnalyzeTextLambdaPermissionAtctranscriptsbucketS3"
+      ]
+    },
+    "TranscribeAudioLambdaPermissionAtcaudiobucketS3": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "TranscribeAudioLambdaFunction",
+            "Arn"
+          ]
+        },
+        "Action": "lambda:InvokeFunction",
+        "Principal": "s3.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition"
+              },
+              ":s3:::atc-audio-bucket"
+            ]
+          ]
+        },
+        "SourceAccount": {
+          "Ref": "AWS::AccountId"
+        }
+      }
+    },
+    "AnalyzeTextLambdaPermissionAtctranscriptsbucketS3": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "AnalyzeTextLambdaFunction",
+            "Arn"
+          ]
+        },
+        "Action": "lambda:InvokeFunction",
+        "Principal": "s3.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition"
+              },
+              ":s3:::atc-transcripts-bucket"
+            ]
+          ]
+        },
+        "SourceAccount": {
+          "Ref": "AWS::AccountId"
+        }
+      }
+    },
+    "NotifyEventSourceMappingSQSAtcNotificationQueue": {
+      "Type": "AWS::Lambda::EventSourceMapping",
+      "DependsOn": [
+        "IamRoleLambdaExecution"
+      ],
+      "Properties": {
+        "BatchSize": 10,
+        "EventSourceArn": {
+          "Fn::GetAtt": [
+            "AtcNotificationQueue",
+            "Arn"
+          ]
+        },
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "NotifyLambdaFunction",
+            "Arn"
+          ]
+        },
+        "Enabled": true
+      }
+    },
+    "AtcTranscriptsBucket": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketName": "atc-transcripts-bucket-us-east-2"
+      }
+    },
+    "AtcNotificationQueue": {
+      "Type": "AWS::SQS::Queue",
+      "Properties": {
+        "QueueName": "atc-notification-queue"
+      }
+    }
+  },
+  "Outputs": {
+    "ServerlessDeploymentBucketName": {
+      "Value": {
+        "Ref": "ServerlessDeploymentBucket"
+      },
+      "Export": {
+        "Name": "sls-atc-monitoring-service-dev-ServerlessDeploymentBucketName"
+      }
+    },
+    "FetchAudioLambdaFunctionQualifiedArn": {
+      "Description": "Current Lambda function version",
+      "Value": {
+        "Ref": "FetchAudioLambdaVersion9LNW9MwAHSNv6N0xk8v8FVkMOJMmJC0ADUTaEUi8YCo"
+      },
+      "Export": {
+        "Name": "sls-atc-monitoring-service-dev-FetchAudioLambdaFunctionQualifiedArn"
+      }
+    },
+    "TranscribeAudioLambdaFunctionQualifiedArn": {
+      "Description": "Current Lambda function version",
+      "Value": {
+        "Ref": "TranscribeAudioLambdaVersiont6kGBBkivM9WhstH7N65Rb4ZzPHKMIEU1OWh1NYZBg"
+      },
+      "Export": {
+        "Name": "sls-atc-monitoring-service-dev-TranscribeAudioLambdaFunctionQualifiedArn"
+      }
+    },
+    "AnalyzeTextLambdaFunctionQualifiedArn": {
+      "Description": "Current Lambda function version",
+      "Value": {
+        "Ref": "AnalyzeTextLambdaVersionAMXnV7ZccIG4TY6nEMpkFGRJsvQNjL20Vi3yX2a7pk"
+      },
+      "Export": {
+        "Name": "sls-atc-monitoring-service-dev-AnalyzeTextLambdaFunctionQualifiedArn"
+      }
+    },
+    "NotifyLambdaFunctionQualifiedArn": {
+      "Description": "Current Lambda function version",
+      "Value": {
+        "Ref": "NotifyLambdaVersionBqxTsmNnV4GIuTpeIQs2vUazQSgckVIvkLFq4W3D1s"
+      },
+      "Export": {
+        "Name": "sls-atc-monitoring-service-dev-NotifyLambdaFunctionQualifiedArn"
+      }
+    }
+  }
+}
